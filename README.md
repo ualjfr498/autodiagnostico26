@@ -26,6 +26,7 @@ Estudiantes de **Desarrollo Rápido de Aplicaciones** en la Universidad de Almer
 | **Juan José Fernández Requena** | [ualjfr498](https://github.com/ualjfr498)
 | **Franco Sergio Pereyra** | [ualfsp323](https://github.com/ualfsp323)
 | **David Granados Pérez** | [dgp336](https://github.com/dgp336)
+| **Pablo Martínez Gálvez** | [pmg943](https://github.com/ualpmg943)
 
 ---
 
