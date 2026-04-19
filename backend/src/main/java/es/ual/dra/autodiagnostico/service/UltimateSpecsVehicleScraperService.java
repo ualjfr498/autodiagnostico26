@@ -53,9 +53,6 @@ public class UltimateSpecsVehicleScraperService {
 
                 List<Map<String, Object>> allBrandsData = new ArrayList<>();
 
-                Path outputPath = Paths.get("scraper-output", "ultimatespecs-first-elements.json");
-                Files.createDirectories(outputPath.getParent());
-
                 for (Element brand : brands) {
 
                         try {
@@ -64,7 +61,9 @@ public class UltimateSpecsVehicleScraperService {
                                 String brandName = brand.select(".home_brand").text();
                                 Element img = brand.selectFirst(".home_brand_logo img");
 
-                                Files.writeString(outputPath, toJson(allBrandsData));
+                                Path outputPath = Paths.get("scraper-output", "ultimatespecs-" + brandName + ".json");
+                                Files.createDirectories(outputPath.getParent());
+
                                 log.info("Preview JSON generated at {}", outputPath.toAbsolutePath());
 
                                 brandData.put("brandName", brandName);
@@ -121,7 +120,7 @@ public class UltimateSpecsVehicleScraperService {
 
                                 log.info("\nModelsData:\n{}", formatForDebug(modelsData));
 
-                                // Debug mode: only first brand
+                                Files.writeString(outputPath, toJson(allBrandsData));
 
                         } catch (Exception e) {
 
@@ -166,31 +165,39 @@ public class UltimateSpecsVehicleScraperService {
                 outputDir.mkdirs();
 
                 for (Element modelBlock : modelBlocks) {
-                        Element modelLink = modelBlock.children().selectFirst("a[href]");
-                        if (modelLink == null) {
-                                modelLink = modelBlock.selectFirst("a[href]");
+                        Elements modelLinks = modelBlock.children().select("a[href]");
+                        if (modelLinks == null) {
+                                modelLinks = modelBlock.select("a[href]");
                         }
 
-                        if (modelLink == null) {
+                        if (modelLinks == null) {
                                 continue;
                         }
+                        List<String> modelUrls = new ArrayList<>();
+                        for (Element modelLink : modelLinks) {
+                                String modelUrl = modelLink.absUrl("href");
+                                if (modelUrl == null || modelUrl.isBlank()) {
+                                        continue;
+                                }
+                                modelUrls.add(modelUrl);
 
-                        String modelUrl = modelLink.absUrl("href");
-                        if (modelUrl == null || modelUrl.isBlank()) {
-                                continue;
                         }
 
                         Map<String, Object> modelData = new HashMap<>();
-                        modelData.put("url", modelUrl);
+                        modelData.put("url", modelUrls);
 
                         Element img = modelBlock.selectFirst("img");
                         Element title = modelBlock.selectFirst("h2");
 
-                        Document modelDoc = Jsoup.connect(modelUrl)
-                                        .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
-                                        .referrer(brandUrl)
-                                        .timeout(10000)
-                                        .get();
+                        Document modelDoc;
+                        for (String modelUrl : modelUrls) {
+
+                                modelDoc = Jsoup.connect(modelUrl)
+                                                .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+                                                .referrer(brandUrl)
+                                                .timeout(10000)
+                                                .get();
+                        }
 
                         List<Map<String, Object>> versionsList = new ArrayList<>();
 
