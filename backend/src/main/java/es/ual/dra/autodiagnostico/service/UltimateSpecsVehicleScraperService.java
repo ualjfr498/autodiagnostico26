@@ -62,9 +62,9 @@ public class UltimateSpecsVehicleScraperService {
 
                         String brandName = brand.select(".home_brand").text();
 
-                        if (!brandName.toLowerCase().trim().equals("seat")) {
-                                continue;
-                        }
+                        // if (!brandName.toLowerCase().trim().equals("seat")) {
+                        // continue;
+                        // }
                         Element img = brand.selectFirst(".home_brand_logo img");
 
                         brandData.put("brandName", brandName);
