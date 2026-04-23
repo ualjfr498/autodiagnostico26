@@ -56,11 +56,22 @@ public class UltimateSpecsVehicleScraperService {
 
                 // int debugCount = 0;
 
+                boolean foundDodge = false;
+
                 for (Element brand : brands) {
 
                         Map<String, Object> brandData = new HashMap<>();
 
                         String brandName = brand.select(".home_brand").text();
+
+                        // 2. Logic to skip until Dodge is hit
+                        if (!foundDodge) {
+                                if (brandName.equalsIgnoreCase("Nissan")) {
+                                        foundDodge = true;
+                                } else {
+                                        continue;
+                                }
+                        }
 
                         // if (!brandName.toLowerCase().trim().equals("seat")) {
                         // continue;
@@ -152,7 +163,7 @@ public class UltimateSpecsVehicleScraperService {
                 // Implementar forma de acceder a href="/es/car-specs/Abarth" para expandir la
                 // lista de modelos, ya que actualmente solo se muestran 5 modelos por marca y
                 // hay marcas con más modelos (ejemplo: Abarth)
-                // modelBlocks son todos los div de las "filas"
+                // modelBlocks son todos los dconnectiv de las "filas"
                 Elements modelRow = doc.select("div.home_models_line");
 
                 // Debug: print model blocks count and total versions count
@@ -380,65 +391,103 @@ public class UltimateSpecsVehicleScraperService {
                                 }
                         }
 
-                        Element versionssDiv = doc.selectFirst("#versions");
-
-                        List<Element> engine_divs = new ArrayList<>();
-
-                        engine_divs.add(versionssDiv.selectFirst("#electric_engines"));
-                        engine_divs.add(versionssDiv.selectFirst("#pluginhybrid_engines"));
-                        engine_divs.add(versionssDiv.selectFirst("#petrol_engines"));
-                        engine_divs.add(versionssDiv.selectFirst("#diesel_engines"));
-                        engine_divs.add(versionssDiv.selectFirst("#other_engines"));
-
-                        List<Map<String, String>> tableData = new ArrayList<>();
-
-                        for (Element engineVersion : engine_divs) {
-                                Element table_version = engineVersion.selectFirst(".table_versions");
-                                if (table_version != null) {
-                                        System.out.println("table_version: " + table_version);
-                                        Elements rows = table_version.select("tr");
-
-                                        if (!rows.isEmpty()) {
-                                                Elements headerCells = rows.get(0).select("th, td");
-                                                List<String> headers = new ArrayList<>();
-                                                for (Element headerCell : headerCells) {
-                                                        String headerText = headerCell.text().trim();
-                                                        headers.add(headerText.isEmpty()
-                                                                        ? "column" + (headers.size() + 1)
-                                                                        : headerText);
-                                                }
-
-                                                for (int rowIndex = 1; rowIndex < rows.size(); rowIndex++) {
-                                                        Elements cells = rows.get(rowIndex).select("td, th");
-                                                        if (cells.isEmpty()) {
-                                                                continue;
-                                                        }
-
-                                                        Map<String, String> rowData = new HashMap<>();
-                                                        for (int i = 0; i < cells.size(); i++) {
-                                                                String key = i < headers.size() ? headers.get(i)
-                                                                                : "column" + (i + 1);
-                                                                String value = cells.get(i).text().trim();
-                                                                System.out.println(key + " -> " + value);
-                                                                rowData.put(key, value);
-                                                        }
-
-                                                        if (!rowData.isEmpty()) {
-                                                                tableData.add(rowData);
-                                                        }
-                                                }
-                                        }
-
-                                        System.out.println("tableData: " + tableData);
-
-                                        versionData.put("table_versions", tableData);
-                                }
-                        }
+                        scrapeTableVersions(doc, versionData, urlFinalModel);
 
                 } catch (IOException e) {
                         log.error("Error scraping version {}: {}", urlFinalModel, e.getMessage());
                 }
                 return versionData;
+        }
+
+        private void scrapeTableVersions(Document doc, Map<String, Object> versionData, String urlFinalModel) {
+                // If the engine sections are hidden behind the fuel-sort button, find that
+                // button's parent anchor in the static HTML and follow its href.
+                Document activeDoc = doc;
+                Element fuelButtonImg = doc.selectFirst("img[src*='fuelw.png']");
+                if (fuelButtonImg != null) {
+                        Element parentAnchor = fuelButtonImg.closest("a[href]");
+                        if (parentAnchor != null) {
+                                String fuelUrl = parentAnchor.absUrl("href");
+                                if (!fuelUrl.isBlank()) {
+                                        try {
+                                                System.out.println("Following fuel-sort button href: " + fuelUrl);
+                                                activeDoc = Jsoup.connect(fuelUrl)
+                                                                .userAgent(
+                                                                                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+                                                                .referrer(urlFinalModel)
+                                                                .timeout(10000)
+                                                                .get();
+                                        } catch (IOException e) {
+                                                log.error("Error fetching fuel-sort URL {}: {}", fuelUrl,
+                                                                e.getMessage());
+                                        }
+                                }
+                        }
+                }
+
+                Element versionssDiv = activeDoc.selectFirst("#versions");
+                if (versionssDiv == null) {
+                        log.warn("No #versions div found for URL: {}", urlFinalModel);
+                        return;
+                }
+
+                List<Element> engine_divs = new ArrayList<>();
+                engine_divs.add(versionssDiv.selectFirst("#electric_engines"));
+                engine_divs.add(versionssDiv.selectFirst("#pluginhybrid_engines"));
+                engine_divs.add(versionssDiv.selectFirst("#petrol_engines"));
+                engine_divs.add(versionssDiv.selectFirst("#diesel_engines"));
+                engine_divs.add(versionssDiv.selectFirst("#other_engines"));
+
+                List<Map<String, String>> tableData = new ArrayList<>();
+
+                System.out.println("url: " + urlFinalModel);
+
+                for (Element engineVersion : engine_divs) {
+                        if (engineVersion == null) {
+                                continue;
+                        }
+                        Element table_version = engineVersion.selectFirst(".table_versions");
+                        if (table_version == null) {
+                                continue;
+                        }
+
+                        System.out.println("table_version: " + table_version);
+                        Elements rows = table_version.select("tr");
+
+                        if (!rows.isEmpty()) {
+                                Elements headerCells = rows.get(0).select("th, td");
+                                List<String> headers = new ArrayList<>();
+                                for (Element headerCell : headerCells) {
+                                        String headerText = headerCell.text().trim();
+                                        headers.add(headerText.isEmpty()
+                                                        ? "column" + (headers.size() + 1)
+                                                        : headerText);
+                                }
+
+                                for (int rowIndex = 1; rowIndex < rows.size(); rowIndex++) {
+                                        Elements cells = rows.get(rowIndex).select("td, th");
+                                        if (cells.isEmpty()) {
+                                                continue;
+                                        }
+
+                                        Map<String, String> rowData = new HashMap<>();
+                                        for (int i = 0; i < cells.size(); i++) {
+                                                String key = i < headers.size() ? headers.get(i)
+                                                                : "column" + (i + 1);
+                                                String value = cells.get(i).text().trim();
+                                                System.out.println(key + " -> " + value);
+                                                rowData.put(key, value);
+                                        }
+
+                                        if (!rowData.isEmpty()) {
+                                                tableData.add(rowData);
+                                        }
+                                }
+                        }
+                }
+
+                System.out.println("tableData: " + tableData);
+                versionData.put("table_versions", tableData);
         }
 
         private void downloadModelImage(String imageUrl, String brandUrl, String modelName) {
