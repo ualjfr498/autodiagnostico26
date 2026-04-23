@@ -119,11 +119,9 @@ public class UltimateSpecsVehicleScraperService {
 
                         List<Map<String, Object>> modelsData = scrapeModelsForBrand(brand);
                         brandData.put("models", modelsData);
-                        allBrandsData.add(brandData);
 
-                        log.info("\nModelsData:\n{}", formatForDebug(modelsData));
+                        Files.writeString(outputPath, toJson(brandData));
 
-                        Files.writeString(outputPath, toJson(allBrandsData));
                         log.info("Preview JSON generated at {}", outputPath.toAbsolutePath());
 
                         // Introduce a wait with a random between 1-10 seconds to avoid Cloudflare 520
